@@ -1,28 +1,37 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
+import sqlite3, pickle
 from dotenv import load_dotenv
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
 from google.genai.types import Content, Part
-
 from hiring_assisting_agent.agent import root_agent
-from single_agent_template import SingleAgent
+from agent_templates import SingleAgent
 
 load_dotenv()
 
 app = FastAPI()
 
 session_service = DatabaseSessionService(db_url='sqlite:///./sessions.db')
-runner = Runner(app_name="MyApp", agent=root_agent, session_service=session_service)
 
 class AgentRequestBody(BaseModel):
     user_id: str
     message: str
 
-@app.post("/interact")
-async def interact(body: AgentRequestBody):
+@app.post("/interact/{agent_id}")
+async def interact(body: AgentRequestBody, agent_id: int):
+    print("interact has called",agent_id)
+    with sqlite3.connect("database.db") as connection:
+        cursor = connection.cursor()
+        cursor.execute("SELECT agent_instance FROM singleagents WHERE agent_id = ?", (agent_id,))
+        row = cursor.fetchone()
+
+    agent = pickle.loads(row[0])
+    print(agent)
+
+    runner = Runner(app_name="MyApp", agent=agent, session_service=session_service)
+
     session = await session_service.create_session(app_name="MyApp", user_id=body.user_id)
     
     content = Content(parts=[Part(text=body.message)], role="user")
@@ -44,7 +53,6 @@ class CreateSingleAgentRequestBody(BaseModel):
 
 @app.post("/create-single-agent")
 def create_single_agent(body: CreateSingleAgentRequestBody):
-    import pickle , sqlite3
 
     single_agent = SingleAgent(body.name, body.model, body.description, body.instruction)
     agent = single_agent.create_ADK_agent()
@@ -60,14 +68,25 @@ def create_single_agent(body: CreateSingleAgentRequestBody):
 
     return {"STATUS":"Success"}
 
+class CreateMultiAgentRequestBody(BaseModel):
+    name : str
+    model : str
+    description : str
+    instruction : str
+    subagents : list
+
+@app.post("/create-multi-agent")
+def create_multi_agent(body: CreateMultiAgentRequestBody):
+    pass
+
 @app.get("/get-agents")
 def get_agents():
     import sqlite3
 
     with sqlite3.connect("database.db") as connection:
         cursor = connection.cursor()
-        cursor.execute("SELECT agent_name from singleagents")
+        cursor.execute("SELECT agent_id, agent_name from singleagents")
         result = cursor.fetchall()
-        agents = [row[0] for row in result]
+        agents = [{"id": row[0], "name": row[1]} for row in result]
 
     return {"agents":agents}
