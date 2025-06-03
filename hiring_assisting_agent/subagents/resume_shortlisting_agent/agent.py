@@ -14,7 +14,7 @@ def fetch_resume() -> dict :
 
     with sqlite3.connect('database.db') as connection:
         cursor = connection.cursor()
-        cursor.execute("SELECT id, data FROM uploaded_files where id=2")
+        cursor.execute("SELECT id, data FROM uploaded_files where id=1")
         resume = cursor.fetchone()
 
     resume_id, blob_data = resume
@@ -33,7 +33,7 @@ def fetch_job_description() -> dict :
 
     with sqlite3.connect('database.db') as connection:
         cursor = connection.cursor()
-        cursor.execute("SELECT job_id, job_description FROM jobs  where job_id=2")
+        cursor.execute("SELECT job_id, job_description FROM jobs  where job_id=1")
         JD = cursor.fetchone()
 
     job_description = JD[1]
